@@ -576,7 +576,7 @@
 
             async function loadGeoJSON() {
                 try {
-                    const response = await fetch('/data/combined_polygons.geojson');
+                    const response = await fetch('data/combined_polygons.geojson');
                     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     const geojson = await response.json();
 
