@@ -12,6 +12,10 @@
       "dest": "/data/$1"
     },
     {
+      "src": "/explanation.pdf",
+      "dest": "/explanation.pdf"
+    },
+    {
       "src": "/(.*)",
       "dest": "/map/index.html"
     }
