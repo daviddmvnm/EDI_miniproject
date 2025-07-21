@@ -2,11 +2,19 @@
   "version": 2,
   "builds": [
     {
-      "src": "map/index.html",
+      "src": "map/**",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "data/**",
       "use": "@vercel/static"
     }
   ],
   "routes": [
+    {
+      "src": "/data/(.*)",
+      "dest": "/data/$1"
+    },
     {
       "src": "/(.*)",
       "dest": "/map/index.html"
