@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Electrification Map 2013-2021</title>
+    <meta charset="utf-8" />
+    <!-- Leaflet CSS and JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Geocoder CSS and JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+    <!-- Color scale for visualization -->
+    <script src="https://unpkg.com/chroma-js@2.4.2/chroma.min.js"></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; height: 100%; }
+        /* Enhanced zoom controls */
+        .leaflet-control-zoom {
+            border: none !important;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1) !important;
+        }
+        .leaflet-control-zoom a {
+            background: rgba(245, 245, 245, 0.9) !important;
+            color: #666 !important;
+            width: 36px !important;
+            height: 36px !important;
+            line-height: 36px !important;
+            font-size: 18px !important;
+            transition: all 0.2s ease;
+        }
+        .leaflet-control-zoom a:hover {
+            background: rgba(255, 255, 255, 1) !important;
+            color: #333 !important;
+        }
+        /* Zoom level indicator */
+        .zoom-level {
+            position: absolute;
+            bottom: 20px;
+            left: 20px; /* Adjusted to bottom left */
+            background: rgba(245, 245, 245, 0.9);
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        /* Documentation link button */
+        .doc-link {
+            position: absolute;
+            top: 20px;
+            right: 250px; /* Moved left by 100px */
+            background: rgba(245, 245, 245, 0.9);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            text-decoration: none;
+            color: #666;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .doc-link:hover {
+            background: rgba(255, 255, 255, 1);
+            color: #333;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+        }
+        .doc-link svg {
+            width: 16px;
+            height: 16px;
+        }
+        /* Splash popup styles */
+        .splash-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(245, 245, 245, 0.8);
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            z-index: 2000;
+            max-width: 500px;
+            width: 90%;
+            backdrop-filter: blur(5px);
+            animation: fadeIn 0.3s ease-out;
+        }
+        .splash-header {
+            font-size: 24px;
+            font-weight: 500;
+            margin-bottom: 15px;
+            color: #333;
+            border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+            padding-bottom: 10px;
+        }
+        .splash-content {
+            font-size: 15px;
+            line-height: 1.6;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        .splash-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+            padding: 5px;
+            line-height: 1;
+            transition: color 0.2s ease;
+        }
+        .splash-close:hover {
+            color: #333;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, -48%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+        /* Legend styles */
+        .legend {
+            padding: 10px 14px 8px 14px;
+            background: #333; /* Black background */
+            color: #fff; /* White text */
+            border: 2px solid #ffe600; /* Yellow border */
+            box-shadow: 0 2px 16px rgba(0,0,0,0.18);
+            border-radius: 10px;
+            line-height: 22px;
+            transition: max-height 0.3s ease-out;
+            overflow: hidden;
+            min-width: 210px;
+            max-width: 270px;
+        }
+        .legend.collapsed {
+            max-height: 40px;
+        }
+        .legend.expanded {
+            max-height: 500px;
+        }
+        .legend i {
+            width: 18px; height: 18px; float: left; margin-right: 8px; opacity: 0.7;
+        }
+        .legend table {
+            border-collapse: collapse;
+            margin-top: 5px;
+        }
+        .legend td {
+            padding: 2px 5px;
+            font-size: 12px;
+        }
+        .legend-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            cursor: pointer;
+            margin-bottom: 5px;
+        }
+        .legend-header h4 {
+            margin: 0 auto;
+            display: block;
+            font-size: 1.13em;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-align: center;
+        }
+        .legend-toggle {
+            background: #ffe600;
+            border: none;
+            color: #222;
+            cursor: pointer;
+            font-size: 15px;
+            padding: 2px 10px;
+            border-radius: 6px;
+            margin-left: 10px;
+            box-shadow: 0 1px 4px #ffe60044;
+            font-weight: 700;
+            transition: transform 0.3s, background 0.2s, color 0.2s;
+        }
+        .legend-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+        .legend-toggle:hover {
+            background: #fff200;
+            color: #111;
+        }
+        .info-tooltip {
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.95);
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            border-radius: 5px;
+            font-size: 13px;
+            max-width: 300px;
+        }
+        .info-tooltip table {
+            margin: 8px 0;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .info-tooltip td {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+        .info-tooltip td:first-child {
+            font-weight: 500;
+            padding-right: 10px;
+        }
+        .info-tooltip tr:last-child td {
+            border-bottom: none;
+        }
+        #error-display, #debug-display {
+            position: fixed; top: 10px; left: 10px;
+            background: rgba(255,255,255,0.9); padding: 10px; border-radius: 5px;
+            z-index: 1000; font-family: monospace; font-size: 12px;
+        }
+        #error-display { color: red; right: 10px; left: auto; display: none; }
+        /* Fixed Geocoder Styles */
+        .leaflet-control-geocoder {
+            position: absolute !important;
+            top: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1500;
+            background: #333;
+            border: 2px solid #ffe600;
+            border-radius: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            display: flex;
+            align-items: center;
+            padding: 4px 8px;
+        }
+        .leaflet-control-geocoder-form {
+            display: flex;
+            width: 100%;
+            align-items: stretch;
+        }
+        .leaflet-control-geocoder-form input {
+            width: 320px;
+            height: 38px;
+            background: #333;
+            color: #fff;
+            border: none;
+            border-radius: 30px 0 0 30px;
+            padding: 0 14px;
+            font-size: 16px;
+        }
+        .leaflet-control-geocoder-form input::placeholder {
+            color: #bbb;
+        }
+        .leaflet-control-geocoder-form button {
+            background: #ffe600;
+            color: #333;
+            border: none;
+            border-radius: 0 30px 30px 0;
+            padding: 0 16px;
+            height: 38px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            transition: background 0.2s ease;
+        }
+        .leaflet-control-geocoder-form button:hover {
+            background: #ffd500;
+        }
+        .leaflet-control-geocoder-alternatives {
+            background: rgba(245, 245, 245, 0.9);
+            border-radius: 0 0 4px 4px;
+            color: #666;
+        }
+        .leaflet-control-geocoder-alternatives li {
+            padding: 8px;
+            cursor: pointer;
+        }
+        .leaflet-control-geocoder-alternatives li:hover {
+            background: rgba(255, 255, 255, 1);
+        }
+        /* Map tile adjustments */
+        .leaflet-tile-pane {
+            opacity: 1;
+        }
+        .leaflet-tile-container img {
+            filter: none;
+        }
+        .leaflet-container {
+            background: #f8f8f8;
+        }
+        /* Base layer control styles */
+        .base-layer-control {
+            background: rgba(245, 245, 245, 0.9);
+            padding: 8px 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        .base-layer-control select {
+            background: #333;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 14px;
+            cursor: pointer;
+            width: 100%;
+        }
+        .base-layer-control select option {
+            background: #333;
+            color: #fff;
+        }
+        .legend.collapsed table {
+            display: none; /* Hide table when collapsed */
+        }
+
+        .legend.expanded table {
+            display: table; /* Show table when expanded */
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="error-display"></div>
+    <script>
+    let countryIdToName = {};
+    fetch('countryid_to_name.json')
+      .then(r => r.json())
+      .then(obj => { countryIdToName = obj; });
+    </script>
+    <div id="ranking-sidebar" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 350px; max-height: 80vh; overflow-y: auto; background: rgba(255,255,255,0.98); border-radius: 14px; box-shadow: 0 4px 32px rgba(0,0,0,0.18); z-index: 1200; padding: 18px 18px 14px 18px; font-size: 15px; display: none; border: 2px solid #333;">
+        <div id="ranking-drag-handle" style="cursor: move; user-select: none; font-weight: bold; color: #111; margin-bottom: 8px; text-align: center; letter-spacing: 1px;">⇅ Drag to Move</div>
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <button class="income-tab" data-group="HIC">HIC</button>
+            <button class="income-tab" data-group="MIC">MIC</button>
+            <button class="income-tab" data-group="LIC">LIC</button>
+        </div>
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <button class="delta-tab" data-sort="risers">Risers</button>
+            <button class="delta-tab" data-sort="fallers">Fallers</button>
+        </div>
+        <div id="ranking-list"></div>
+    </div>
+    <button id="toggle-ranking" style="position: absolute; top: 30px; left: calc(50% + 350px); transform: translateX(-50%); z-index: 1300; background: #333; color: #fff; border: 2.5px solid #ffe600; box-shadow: 0 0 8px 1.5px #ffe60080, 0 2px 12px rgba(0,0,0,0.18); border-radius: 6px; padding: 10px 28px; font-size: 17px; font-weight: 600; cursor: pointer; letter-spacing: 1px;">Show Rankings</button>
+    <a href="../explanation.pdf" target="_blank" class="doc-link">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="2" width="18" height="20" rx="2" ry="2"></rect>
+            <line x1="9" y1="9" x2="15" y2="9"></line>
+            <line x1="9" y1="13" x2="15" y2="13"></line>
+            <line x1="9" y1="17" x2="13" y2="17"></line>
+        </svg>
+        Explaining the Model (PDF)
+    </a>
+    <div class="splash-container" id="splash">
+        <button class="splash-close" onclick="closeSplash()">&times;</button>
+        <div class="splash-header">Welcome to the Electrification Map</div>
+        <div class="splash-content">
+            This interactive map visualizes <b>Relative Electrification</b> changes between 2013-2021.<br>
+            <br>
+            Areas in red indicate regions where electricity use is growing faster than population metrics would predict, while blue areas show regions with lower than expected growth.<br>
+            <br>
+            <b>Note:</b> You'll need to zoom in to see detailed data for specific areas.<br><br>
+            Use the search bar to find specific locations, or click and drag to explore the map.
+        </div>
+    </div>
+    <script>
+        function closeSplash() {
+            const splash = document.getElementById('splash');
+            splash.style.opacity = '0';
+            setTimeout(() => {
+                splash.style.display = 'none';
+                showZoomMessage();
+            }, 300);
+        }
+
+        function showZoomMessage() {
+            const message = document.createElement('div');
+            message.id = 'zoom-message';
+            message.style.position = 'absolute';
+            message.style.top = '50%';
+            message.style.left = '50%';
+            message.style.transform = 'translate(-50%, -50%)';
+            message.style.background = 'rgba(255, 230, 0, 0.9)'; // Electric yellow
+            message.style.color = '#333';
+            message.style.padding = '20px';
+            message.style.borderRadius = '8px';
+            message.style.fontSize = '18px';
+            message.style.zIndex = '3000';
+            message.style.textAlign = 'center';
+            message.innerHTML = 'Zoom in to see real data and trends';
+            document.body.appendChild(message);
+
+            setTimeout(() => {
+                message.style.transition = 'opacity 1s ease';
+                message.style.opacity = '0';
+                setTimeout(() => document.body.removeChild(message), 1000);
+            }, 3000);
+        }
+
+        // --- DRAGGABLE RANKING SIDEBAR ---
+        (function() {
+            const sidebar = document.getElementById('ranking-sidebar');
+            const handle = document.getElementById('ranking-drag-handle');
+            let isDragging = false, startX, startY, startLeft, startTop;
+
+            handle.addEventListener('mousedown', function(e) {
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                // Get current left/top in px
+                const rect = sidebar.getBoundingClientRect();
+                startLeft = rect.left;
+                startTop = rect.top;
+                document.body.style.userSelect = 'none';
+            });
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                sidebar.style.left = (startLeft + dx) + 'px';
+                sidebar.style.top = (startTop + dy) + 'px';
+                sidebar.style.transform = 'none';
+            });
+            document.addEventListener('mouseup', function() {
+                isDragging = false;
+                document.body.style.userSelect = '';
+            });
+        })();
+
+        // Check if we should show the splash
+        window.addEventListener('load', function() {
+            function showError(msg) {
+                const e = document.getElementById('error-display');
+                e.style.display = 'block'; 
+                e.innerHTML += msg + '<br>'; 
+                console.error(msg);
+            }
+
+            function formatPercentChange(value) {
+                const percentChange = (Math.exp(value) - 1) * 100;
+                return `${percentChange > 0 ? '+' : ''}${percentChange.toFixed(1)}%`;
+            }
+
+            function formatAbsoluteChange(value) {
+                const magnitude = Math.abs(value).toFixed(2);
+                let interpretation;
+                if (value > 0) {
+                    if (Math.abs(value) < 0.1) {
+                        interpretation = "Nighttime electricity use growing proportionally with development";
+                    } else if (Math.abs(value) < 0.5) {
+                        interpretation = "Nighttime electricity use growing slightly faster than development";
+                    } else if (Math.abs(value) < 1.0) {
+                        interpretation = "Nighttime electricity use growing moderately faster than development";
+                    } else {
+                        interpretation = "Nighttime electricity use growing substantially faster than development";
+                    }
+                } else {
+                    if (Math.abs(value) < 0.1) {
+                        interpretation = "Nighttime electricity use slightly below expected levels";
+                    } else if (Math.abs(value) < 0.5) {
+                        interpretation = "Nighttime electricity use notably below expected levels";
+                    } else if (Math.abs(value) < 1.0) {
+                        interpretation = "Nighttime electricity use significantly below expected levels";
+                    } else {
+                        interpretation = "Nighttime electricity use substantially below expected levels";
+                    }
+                }
+                return `${value > 0 ? '+' : ''}${magnitude} (${interpretation})`;
+            }
+
+            const map = L.map('map', {
+                worldCopyJump: true,
+                maxBounds: [[-90, -180], [90, 180]],
+                maxBoundsViscosity: 1.0,
+                minZoom: 3,
+                // Enhanced zoom options
+                zoomControl: true,
+                doubleClickZoom: true,
+                scrollWheelZoom: 'center',
+                zoomSnap: 0.5,
+                zoomDelta: 0.5,
+                wheelDebounceTime: 40
+            }).setView([20, 0], 3); // Reset to default view
+
+            // Add zoom level indicator
+            const zoomIndicator = L.control({position: 'bottomleft'});
+            zoomIndicator.onAdd = function(map) {
+                const div = L.DomUtil.create('div', 'zoom-level');
+                div.innerHTML = `Zoom: ${map.getZoom()}x`;
+                map.on('zoomend', function() {
+                    div.innerHTML = `Zoom: ${map.getZoom()}x`;
+                });
+                return div;
+            };
+            zoomIndicator.addTo(map);
+
+            // Add keyboard shortcuts for zooming
+            document.addEventListener('keydown', function(e) {
+                if (e.key === '=' || e.key === '+') {  // Plus key
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                        map.zoomIn(0.5);
+                    }
+                } else if (e.key === '-') {  // Minus key
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                        map.zoomOut(0.5);
+                    }
+                }
+            });
+
+            // Create the geocoder but don’t add it directly to map
+            const geocoder = L.Control.geocoder({
+                defaultMarkGeocode: true
+            });
+            // Add it to map temporarily to generate the DOM element
+            geocoder.addTo(map);
+            // Detach it from map corner container
+            const geoContainer = geocoder.getContainer();
+            geoContainer.parentNode.removeChild(geoContainer);
+            // Append to body (or anywhere you want)
+            document.body.appendChild(geoContainer);
+
+            // Define base layers
+            const baseLayers = {
+                "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                    maxZoom: 19
+                }),
+                "CartoDB Dark Matter": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+                    maxZoom: 19
+                }),
+                "CartoDB Voyager": L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+                    maxZoom: 19
+                })
+            };
+
+            // Add the default base layer to the map
+            baseLayers["CartoDB Dark Matter"].addTo(map);
+
+            // Remove existing Leaflet layer control
+            // L.control.layers(baseLayers).addTo(map);
+
+            // Custom control for base layer toggle
+            const baseLayerControl = L.control({position: 'topright'});
+
+            baseLayerControl.onAdd = function(map) {
+                const div = L.DomUtil.create('div', 'base-layer-control');
+                div.innerHTML = `
+                    <select id="base-layer-select">
+                        <option value="Satellite">Satellite</option>
+                        <option value="CartoDB Dark Matter">CartoDB Dark Matter</option>
+                        <option value="CartoDB Voyager">CartoDB Voyager</option>
+                    </select>
+                `;
+                return div;
+            };
+
+            baseLayerControl.addTo(map);
+
+            // Event listener for base layer selection
+            document.getElementById('base-layer-select').addEventListener('change', function(e) {
+                const selectedLayer = e.target.value;
+                Object.values(baseLayers).forEach(layer => map.removeLayer(layer));
+                baseLayers[selectedLayer].addTo(map);
+            });
+
+            // Labels and borders overlay
+            L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Labels & Boundaries &copy; Esri',
+                maxZoom: 19,
+                pane: 'overlayPane'
+            }).addTo(map);
+
+            async function loadGeoJSON() {
+                try {
+                    const response = await fetch('../data/combined_polygons.geojson');
+                    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    const geojson = await response.json();
+
+                    // --- INCOME GROUP CLASSIFICATION ---
+                    function getIncomeGroup(gdp) {
+                        if (gdp >= 13945) return 'HIC'; // High income
+                        if (gdp >= 4256) return 'MIC';  // Middle income
+                        return 'LIC';                  // Low income
+                    }
+
+                    // Group features by country (using country_id)
+                    const countryMap = {};
+                    geojson.features.forEach(f => {
+                        const id = f.properties.country_id;
+                        if (!countryMap[id]) countryMap[id] = [];
+                        countryMap[id].push(f);
+                    });
+
+                    // Aggregate by country: mean delta, mean gdp, group
+                    const countryStats = Object.entries(countryMap).map(([id, feats]) => {
+                        const mean = arr => arr.reduce((a,b) => a+b,0)/arr.length;
+                        const delta = mean(feats.map(f => f.properties.ensi_delta));
+                        const gdp = mean(feats.map(f => f.properties.gdp_per_capita));
+                        // Use countryIdToName mapping for display
+                        const name = countryIdToName[id] || id;
+                        return {
+                            id, name, delta, gdp,
+                            group: getIncomeGroup(gdp),
+                            feats
+                        };
+                    });
+
+                    // Sorters
+                    function sortRisers(a, b) { return b.delta - a.delta; }
+                    function sortFallers(a, b) { return a.delta - b.delta; }
+
+                    // Build ranking lists
+                    const rankings = { HIC: {}, MIC: {}, LIC: {} };
+                    ['HIC','MIC','LIC'].forEach(group => {
+                        const stats = countryStats.filter(c => c.group === group);
+                        rankings[group].risers = [...stats].sort(sortRisers);
+                        rankings[group].fallers = [...stats].sort(sortFallers);
+                    });
+
+                    // --- MAP LAYER ---
+                    // Get all ENSI values for percentile calculation
+                    const values = geojson.features.map(f => f.properties.ensi_delta)
+                        .filter(v => v != null && !isNaN(v) && isFinite(v));
+                    values.sort((a, b) => a - b);
+
+                    // Ensure white is always at 0, and colors pop more
+                    const min = values[0];
+                    const max = values[values.length-1];
+                    // Find the most negative and most positive values for symmetric stops
+                    const neg = values.filter(v => v < 0);
+                    const pos = values.filter(v => v > 0);
+                    const neg20 = neg.length ? neg[Math.floor(neg.length * 0.2)] : 0;
+                    const neg60 = neg.length ? neg[Math.floor(neg.length * 0.6)] : 0;
+                    const pos20 = pos.length ? pos[Math.floor(pos.length * 0.2)] : 0;
+                    const pos60 = pos.length ? pos[Math.floor(pos.length * 0.6)] : 0;
+                    // Color stops: min, strong blue, light blue, 0 (white), light red, strong red, max
+                    const colorStops = [
+                        min,
+                        neg60,
+                        neg20,
+                        0,
+                        pos20,
+                        pos60,
+                        max
+                    ];
+                    // More saturated blue-white-red
+                    const colorScale = chroma.scale([
+                        '#0000ff', // Stronger blue
+                        '#3399ff', // More saturated light blue
+                        '#ffffff', // White at 0
+                        '#ff9966', // More saturated light orange/red
+                        '#ff0000'  // Stronger red
+                    ]).domain([min, neg60, neg20, 0, pos20, pos60, max]);
+
+                    function formatNumber(num) {
+                        return new Intl.NumberFormat().format(Math.round(num));
+                    }
+
+                    const layer = L.geoJSON(geojson, {
+                        style: feature => {
+                            const val = feature.properties.ensi_delta;
+                            if (val === null || isNaN(val)) return {opacity: 0, fillOpacity: 0};
+                            return {
+                                fillColor: colorScale(val).hex(),
+                                weight: 0.5,
+                                opacity: 1,
+                                color: '#333',
+                                fillOpacity: 0.4
+                            };
+                        },
+                        onEachFeature: (feature, lyr) => {
+                            const props = feature.properties;
+                            if (props.ensi_delta === null || isNaN(props.ensi_delta)) return;
+
+                            let incomeLevel;
+                            if (props.gdp_per_capita >= 13945) {
+                                incomeLevel = 'High-income';
+                            } else if (props.gdp_per_capita >= 4256) {
+                                incomeLevel = 'Middle-income';
+                            } else {
+                                incomeLevel = 'Low-income';
+                            }
+
+                            let electrificationTrend = props.ensi_delta > 0 ? 'Rising' : 'Falling';
+
+                            let analysis;
+                            if (incomeLevel === 'High-income') {
+                                analysis = electrificationTrend === 'Rising' ? 'Likely urban sprawl or higher per-capita usage (more electricity used per person)' : 'Likely efficiency gains, urban consolidation (less electricity used per person)';
+                            } else if (incomeLevel === 'Middle-income') {
+                                analysis = electrificationTrend === 'Rising' ? 'Likely rapid electrification' : 'Likely potential grid constraints';
+                            } else {
+                                analysis = electrificationTrend === 'Rising' ? 'Likely early-stage electrification demand' : 'Likely energy poverty risk';
+                            }
+
+                            function getDetailedExplanation(incomeLevel, trend) {
+                                if (incomeLevel === 'High-income') {
+                                    return trend === 'Rising' ? 'Urban sprawl refers to the uncontrolled expansion of urban areas. Higher per-capita usage means more electricity is used per person, often due to increased consumption or inefficient usage.' : 'Efficiency gains mean using less electricity for the same output, often through technology or better practices. Urban consolidation refers to the process of increasing population density in urban areas, which can lead to more efficient energy use.';
+                                } else if (incomeLevel === 'Middle-income') {
+                                    return trend === 'Rising' ? 'Rapid electrification indicates a fast expansion of electricity access, often driven by infrastructure development.' : 'Potential grid constraints refer to limitations in the electricity grid that can hinder supply, often due to outdated infrastructure or high demand.';
+                                } else {
+                                    return trend === 'Rising' ? 'Early-stage electrification demand means there is a growing need for electricity as areas begin to develop and modernize.' : 'Energy poverty risk indicates a lack of access to modern energy services, which can limit economic and social development.';
+                                }
+                            }
+
+                            lyr.bindPopup(`
+                                <div class="info-tooltip">
+                                    <strong style="font-size: 1.1em;">${analysis}</strong>
+                                    <button class="info-button" onclick="alert('${getDetailedExplanation(incomeLevel, electrificationTrend)}')">ℹ️</button>
+                                    <div style="font-size: 0.9em; margin-top: 8px; color: #666;">
+                                        Country: ${countryIdToName[props.country_id] || props.country_id}<br>
+                                        GDP per Capita: $${formatNumber(props.gdp_per_capita)}<br>
+                                        Population Density: ${formatNumber(props.population_density)} people/km²
+                                    </div>
+                                </div>
+                            `);
+                        }
+                    });
+
+                    layer.addTo(map);
+                    map.fitBounds(layer.getBounds(), {padding: [20, 20]});
+
+                    // --- RANKING SIDEBAR LOGIC ---
+                    const sidebar = document.getElementById('ranking-sidebar');
+                    const toggleBtn = document.getElementById('toggle-ranking');
+                    const rankingList = document.getElementById('ranking-list');
+                    let currentGroup = 'HIC';
+                    let currentSort = 'risers';
+
+                    function renderRanking() {
+                        const list = rankings[currentGroup][currentSort];
+                        rankingList.innerHTML = list.map((c, i) => `
+                            <div class="ranking-item" data-id="${c.id}" style="padding: 6px 0; border-bottom: 1px solid #eee; cursor: pointer;">
+                                <b>#${i+1}</b> <span style="color:#222; font-size:1.08em; font-weight:500;">${c.name}</span><br>
+                                <span style="font-size:12px;">Δ Relative Electrification: ${formatAbsoluteChange(c.delta)} | GDP: $${formatNumber(c.gdp)}</span>
+                            </div>
+                        `).join('');
+                    }
+
+                    // Tab logic
+                    sidebar.querySelectorAll('.income-tab').forEach(btn => {
+                        btn.onclick = () => {
+                            currentGroup = btn.dataset.group;
+                            renderRanking();
+                        };
+                    });
+                    sidebar.querySelectorAll('.delta-tab').forEach(btn => {
+                        btn.onclick = () => {
+                            currentSort = btn.dataset.sort;
+                            renderRanking();
+                        };
+                    });
+
+                    // Click to fly to country
+                    rankingList.onclick = function(e) {
+                        let el = e.target;
+                        while (el && !el.classList.contains('ranking-item')) el = el.parentElement;
+                        if (!el) return;
+                        const id = el.dataset.id;
+                        // Find all features for this country
+                        const feats = countryMap[id];
+                        if (!feats) return;
+                        // Get bounds
+                        const bounds = L.geoJSON({type:'FeatureCollection',features:feats}).getBounds();
+                        map.fitBounds(bounds, {padding: [20,20]});
+                        // Open popup for first feature
+                        layer.eachLayer(l => {
+                            if (l.feature && l.feature.properties.country_id === id) {
+                                l.openPopup();
+                                return false;
+                            }
+                        });
+                    };
+
+                    // Toggle sidebar
+                    toggleBtn.onclick = function() {
+                        if (sidebar.style.display === 'none' || sidebar.style.display === '') {
+                            sidebar.style.display = 'block';
+                            toggleBtn.textContent = 'Hide Rankings';
+                            renderRanking();
+                        } else {
+                            sidebar.style.display = 'none';
+                            toggleBtn.textContent = 'Show Rankings';
+                        }
+                    };
+                    // Hide rankings by default
+                    sidebar.style.display = 'none';
+                    toggleBtn.textContent = 'Show Rankings';
+
+                    // Add legend
+                    const legend = L.control({position: 'bottomright'});
+                    legend.onAdd = () => {
+                        const div = L.DomUtil.create('div', 'legend collapsed');
+                        const legendContent = `
+                            <div class="legend-header">
+                                <h4>Key</h4>
+                                <button class="legend-toggle collapsed" style="position:absolute; right:8px; top:50%; transform:translateY(-50%);">▼</button>
+                            </div>
+                            <table>
+                                <tr><td><i style="background:${colorScale(colorStops[0])}"></i></td>
+                                    <td>Lowest value<br>${formatAbsoluteChange(colorStops[0])}</td></tr>
+                                <tr><td><i style="background:${colorScale(colorStops[1])}"></i></td>
+                                    <td>Strongly below average<br>${formatAbsoluteChange(colorStops[1])}</td></tr>
+                                <tr><td><i style="background:${colorScale(colorStops[2])}"></i></td>
+                                    <td>Slightly below average<br>${formatAbsoluteChange(colorStops[2])}</td></tr>
+                                <tr><td><i style="background:${colorScale(0)};border:1px solid #999"></i></td>
+                                    <td>No change (0)</td></tr>
+                                <tr><td><i style="background:${colorScale(colorStops[4])}"></i></td>
+                                    <td>Slightly above average<br>${formatAbsoluteChange(colorStops[4])}</td></tr>
+                                <tr><td><i style="background:${colorScale(colorStops[5])}"></i></td>
+                                    <td>Strongly above average<br>${formatAbsoluteChange(colorStops[5])}</td></tr>
+                                <tr><td><i style="background:${colorScale(colorStops[6])}"></i></td>
+                                    <td>Highest value<br>${formatAbsoluteChange(colorStops[6])}</td></tr>
+                            </table>`;
+                        div.innerHTML = legendContent;
+
+                        // Add click handler for toggle button
+                        setTimeout(() => {
+                            const toggle = div.querySelector('.legend-toggle');
+                            toggle.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                div.classList.toggle('collapsed');
+                                div.classList.toggle('expanded');
+                                toggle.classList.toggle('collapsed');
+                            });
+                        }, 0);
+
+                        return div;
+                    };
+                    legend.addTo(map);
+
+                    // Change legend color based on zoom level
+                    map.on('zoomend', function() {
+                        const legend = document.querySelector('.legend');
+                        if (map.getZoom() === 3) {
+                            legend.style.background = '#ff0000'; // Bright red
+                            // Alternatively, use electric blue: legend.style.background = '#00ffff';
+                        } else {
+                            legend.style.background = '#333'; // Default black
+                        }
+                    });
+
+                    // Remove zoom event listener for tile color change
+                    // map.on('zoomend', function() {
+                    //     const newColorScale = map.getZoom() === 3 ?
+                    //         chroma.scale(['#ff0000', '#ffffff', '#00ffff']) : // Bright red to electric blue
+                    //         chroma.scale(['#0000ff', '#3399ff', '#ffffff', '#ff9966', '#ff0000']); // Default scale
+
+                    //     layer.setStyle(feature => {
+                    //         const val = feature.properties.ensi_delta;
+                    //         if (val === null || isNaN(val)) return {opacity: 0, fillOpacity: 0};
+                    //         return {
+                    //             fillColor: newColorScale(val).hex(),
+                    //             weight: 0.5,
+                    //             opacity: 1,
+                    //             color: '#333',
+                    //             fillOpacity: 0.4
+                    //         };
+                    //     });
+                    // });
+
+                } catch (err) {
+                    showError(`Failed to load GeoJSON: ${err.message}`);
+                    console.error(err);
+                }
+            }
+
+            function calculateExpectedElectrification(gdpPerCapita, populationDensity) {
+                // Placeholder function for calculating expected electrification
+                // You can replace this with your actual calculation logic
+                return gdpPerCapita * 0.1 + populationDensity * 0.05;
+            }
+            loadGeoJSON();
+        });
+    </script>
+    <style>
+        /* Restore prominent centered ranking button */
+        #toggle-ranking {
+            position: absolute;
+            top: 30px;
+            left: calc(50% + 350px);
+            transform: translateX(-50%);
+            z-index: 1300;
+            background: #333;
+            color: #fff;
+            border: 2.5px solid #ffe600;
+            box-shadow: 0 0 8px 1.5px #ffe60080, 0 2px 12px rgba(0,0,0,0.18);
+            border-radius: 6px;
+            padding: 10px 28px;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            letter-spacing: 1px;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        #toggle-ranking:hover {
+            background: #222;
+            box-shadow: 0 0 16px 3px #ffe600cc, 0 2px 16px rgba(0,0,0,0.22);
+        }
+        /* Restore search bar to top left */
+        .leaflet-control-geocoder {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1400;
+            background: #333;
+            border: 2.5px solid #ffe600;
+            border-radius: 22px;
+            box-shadow: 0 0 8px 1.5px #ffe60080, 0 2px 12px rgba(0,0,0,0.18);
+            padding: 4px;
+        }
+        .leaflet-control-geocoder-form input {
+            width: 280px;
+            height: 38px;
+            background: #333;
+            color: #fff;
+            border: none;
+            border-radius: 20px;
+            padding: 0 14px;
+            font-size: 16px;
+        }
+        .leaflet-control-geocoder-form input::placeholder {
+            color: #aaa;
+        }
+        .leaflet-control-geocoder button {
+            background: #ffe600;
+            color: #333;
+            border-radius: 50%;
+            border: none;
+        }
+        /* Restore ranking sidebar to prominent centered style */
+        #ranking-sidebar {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 350px;
+            max-height: 80vh;
+            overflow-y: auto;
+            background: rgba(255,255,255,0.98);
+            border-radius: 14px;
+            box-shadow: 0 4px 32px rgba(0,0,0,0.18);
+            z-index: 1200;
+            padding: 18px 18px 14px 18px;
+            font-size: 15px;
+            display: none;
+            border: 2px solid #333;
+        }
+        .leaflet-top.leaflet-left .leaflet-control-zoom {
+            /* margin-top: 100px !important; */
+            margin-top: 20px !important;
+        }
+    </style>
+    <script>
+    // --- Real Input Search Bar Logic ---
+    (function() {
+        const bar = document.getElementById('geocoder-wrapper');
+        let geocoderInput = null;
+        let geocoderControl = null;
+        // Try to find geocoder input after map loads
+        function findGeocoder() {
+            geocoderInput = document.querySelector('.leaflet-control-geocoder-form input');
+            geocoderControl = document.querySelector('.leaflet-control-geocoder');
+        }
+        // Show and focus geocoder input
+        function activateGeocoder() {
+            findGeocoder();
+            if (geocoderControl) {
+                geocoderControl.style.display = 'flex';
+                geocoderInput && geocoderInput.focus();
+            }
+        }
+        // Hide geocoder if not focused
+        function maybeHideGeocoder(e) {
+            if (!geocoderControl) return;
+            // If focus moves outside geocoder and bar, hide geocoder
+            setTimeout(() => {
+                const active = document.activeElement;
+                if (active !== geocoderInput && active !== bar) {
+                    geocoderControl.style.display = 'none';
+                    bar.value = '';
+                }
+            }, 100);
+        }
+        // Enter key sends input to geocoder, triggers search, and clears input
+        bar.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                activateGeocoder();
+                if (geocoderInput) {
+                    geocoderInput.value = bar.value;
+                    geocoderInput.dispatchEvent(new KeyboardEvent('keydown', {'key': 'Enter'}));
+                    // Clear the input field after triggering search
+                    bar.value = '';
+                    // Hide the geocoder after search
+                    setTimeout(() => {
+                        geocoderControl.style.display = 'none';
+                    }, 100);
+                }
+            }
+        });
+        // When geocoder input is focused, keep bar focused style
+        document.addEventListener('focusin', e => {
+            findGeocoder();
+            if (e.target === geocoderInput) {
+                geocoderControl.style.display = 'flex';
+            }
+        });
+        // When focus leaves both, hide geocoder
+        document.addEventListener('focusout', maybeHideGeocoder);
+        // Hide geocoder on page load
+        window.addEventListener('load', () => {
+            findGeocoder();
+            if (geocoderControl) geocoderControl.style.display = 'none';
+        });
+    })();
+    </script>
+</body>
+</html>
