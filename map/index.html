@@ -324,7 +324,7 @@
     <div id="error-display"></div>
     <script>
     let countryIdToName = {};
-    fetch('countryid_to_name.json')
+    fetch('/map/countryid_to_name.json')
       .then(r => r.json())
       .then(obj => { countryIdToName = obj; });
     </script>
