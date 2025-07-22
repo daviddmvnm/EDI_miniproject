@@ -16,6 +16,10 @@
       "dest": "/explanation.pdf"
     },
     {
+      "src": "/map/countryid_to_name.json",
+      "dest": "/map/countryid_to_name.json"
+    },
+    {
       "src": "/(.*)",
       "dest": "/map/index.html"
     }
